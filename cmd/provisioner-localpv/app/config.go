@@ -18,6 +18,7 @@ limitations under the License.
 package app
 
 import (
+	"strconv"
 	"strings"
 
 	mconfig "github.com/openebs/maya/pkg/apis/openebs.io/v1alpha1"
@@ -78,6 +79,35 @@ const (
 	//
 	KeyBDTag = "BlockDeviceTag"
 
+	//KeyEnforceQuota defines if the capacity needs to be enforced
+	// on the Local PV.
+	//In case of Local PV (hostpath), a sparse device with
+	// required capacity will be created and provided to Local PV.
+	//In case of Local PV (device), the block device can be partitioned
+	// with the required capacity. However, this is currently not supported.
+	//
+	//Usage: Local PV hostpath StorageClass with Capacity Enforcement enabled
+	// will be as follows:
+	//
+	// kind: StorageClass
+	// metadata:
+	//   name: openebs-hostpath-with-quota
+	//   annotations:
+	//     openebs.io/cas-type: local
+	//     cas.openebs.io/config: |
+	//       - name: StorageType
+	//         value: "hostpath"
+	//       - name: EnforceQuota
+	//         value: "true"
+	// provisioner: openebs.io/local
+	// volumeBindingMode: WaitForFirstConsumer
+	// reclaimPolicy: Delete
+	//
+	KeyEnforceQuota = "EnforceQuota"
+
+	//KeyPVRelativePath defines the alternate folder name under the BasePath
+	// By default, the pv name will be used as the folder name.
+	// KeyPVBasePath can be useful for providing the same underlying folder
 	//KeyPVRelativePath defines the alternate folder name under the BasePath
 	// By default, the pv name will be used as the folder name.
 	// KeyPVBasePath can be useful for providing the same underlying folder
@@ -186,6 +216,19 @@ func (c *VolumeConfig) GetBDTagValue() string {
 		return ""
 	}
 	return bdTagValue
+}
+
+//GetEnforceQuotaValue returns the EnforceQuota
+//value configured in StorageClass.
+//
+//Default is "false", capacity will not be enforced.
+func (c *VolumeConfig) GetEnforceQuotaValue() bool {
+	enforceQuotaValue := c.getValue(KeyBDTag)
+	if len(strings.TrimSpace(enforceQuotaValue)) == 0 {
+		return false
+	}
+	enforceQuotaValueBool, _ := strconv.ParseBool(enforceQuotaValue)
+	return enforceQuotaValueBool
 }
 
 //GetPath returns a valid PV path based on the configuration

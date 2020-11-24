@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog"
+	"path/filepath"
 
 	pvController "sigs.k8s.io/sig-storage-lib-external-provisioner/controller"
 	//pvController "github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
@@ -39,6 +40,9 @@ func (p *Provisioner) ProvisionHostPath(opts pvController.ProvisionOptions, volu
 	name := opts.PVName
 	stgType := volumeConfig.GetStorageType()
 	saName := getOpenEBSServiceAccountName()
+	capacity := opts.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	enforceQuota := volumeConfig.GetEnforceQuotaValue()
+	fsType := volumeConfig.GetFSType()
 
 	path, err := volumeConfig.GetPath()
 	if err != nil {
@@ -61,6 +65,8 @@ func (p *Provisioner) ProvisionHostPath(opts pvController.ProvisionOptions, volu
 		name:               name,
 		path:               path,
 		nodeHostname:       nodeHostname,
+		enforceQuota:       enforceQuota,
+		capacity:           capacity.String(),
 		serviceAccountName: saName,
 		selectedNodeTaints: taints,
 	}
@@ -96,16 +102,23 @@ func (p *Provisioner) ProvisionHostPath(opts pvController.ProvisionOptions, volu
 	//labels[string(v1alpha1.StorageClassKey)] = *className
 
 	//TODO Change the following to a builder pattern
-	pvObj, err := persistentvolume.NewBuilder().
+	pvObjBuilder := persistentvolume.NewBuilder().
 		WithName(name).
 		WithLabels(labels).
 		WithReclaimPolicy(*opts.StorageClass.ReclaimPolicy).
 		WithAccessModes(pvc.Spec.AccessModes).
 		WithVolumeMode(fs).
 		WithCapacityQty(pvc.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]).
-		WithLocalHostDirectory(path).
-		WithNodeAffinity(nodeHostname).
-		Build()
+		WithNodeAffinity(nodeHostname)
+
+	if enforceQuota {
+		pvObjBuilder.WithLocalHostPathFormat(filepath.Join(path, "disk.img"), fsType)
+	} else {
+		pvObjBuilder.WithLocalHostDirectory(path)
+	}
+
+	//Build the pvObject
+	pvObj, err := pvObjBuilder.Build()
 
 	if err != nil {
 		alertlog.Logger.Errorw("",

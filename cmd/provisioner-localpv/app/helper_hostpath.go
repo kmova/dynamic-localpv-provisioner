@@ -65,6 +65,12 @@ type HelperPodOptions struct {
 	//path is the volume hostpath directory
 	path string
 
+	//enforceQuota is the flag to create sparse image
+	enforceQuota bool
+
+	//capacity is the capacity requested in PVC
+	capacity string
+
 	// serviceAccountName is the service account with which the pod should be launched
 	serviceAccountName string
 
@@ -164,6 +170,12 @@ func (p *Provisioner) launchPod(config podConfig) (*corev1.Pod, error) {
 	// Helper pods need to create and delete directories on the host.
 	privileged := true
 
+	volumeAbsDir := filepath.Join("/data/", config.volumeDir)
+	executeCmdLine := append(config.pOpts.cmdsForPath, volumeAbsDir)
+	if config.pOpts.enforceQuota {
+		executeCmdLine = append(executeCmdLine, ";", "truncate", "-s", config.pOpts.capacity, filepath.Join(volumeAbsDir, "disk.img"))
+	}
+
 	helperPod, err := pod.NewBuilder().
 		WithName(config.podName + "-" + config.pOpts.name).
 		WithRestartPolicy(corev1.RestartPolicyNever).
@@ -174,7 +186,8 @@ func (p *Provisioner) launchPod(config podConfig) (*corev1.Pod, error) {
 			container.NewBuilder().
 				WithName("local-path-" + config.podName).
 				WithImage(p.helperImage).
-				WithCommandNew(append(config.pOpts.cmdsForPath, filepath.Join("/data/", config.volumeDir))).
+				WithCommandNew(executeCmdLine).
+				//WithCommandNew(append(config.pOpts.cmdsForPath, filepath.Join("/data/", config.volumeDir))).
 				WithVolumeMountsNew([]corev1.VolumeMount{
 					{
 						Name:      "data",
