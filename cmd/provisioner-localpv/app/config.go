@@ -223,7 +223,7 @@ func (c *VolumeConfig) GetBDTagValue() string {
 //
 //Default is "false", capacity will not be enforced.
 func (c *VolumeConfig) GetEnforceQuotaValue() bool {
-	enforceQuotaValue := c.getValue(KeyBDTag)
+	enforceQuotaValue := c.getValue(KeyEnforceQuota)
 	if len(strings.TrimSpace(enforceQuotaValue)) == 0 {
 		return false
 	}

@@ -57,6 +57,7 @@ func (p *Provisioner) ProvisionHostPath(opts pvController.ProvisionOptions, volu
 	}
 
 	klog.Infof("Creating volume %v at %v:%v", name, nodeHostname, path)
+	klog.Infof("Enforce quota on volume %v with size %v", enforceQuota, capacity.String())
 
 	//Before using the path for local PV, make sure it is created.
 	initCmdsForPath := []string{"mkdir", "-m", "0777", "-p"}

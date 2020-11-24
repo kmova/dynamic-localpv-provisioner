@@ -21,6 +21,7 @@ package app
 
 import (
 	"path/filepath"
+	"strings"
 	"time"
 
 	errors "github.com/pkg/errors"
@@ -171,10 +172,13 @@ func (p *Provisioner) launchPod(config podConfig) (*corev1.Pod, error) {
 	privileged := true
 
 	volumeAbsDir := filepath.Join("/data/", config.volumeDir)
-	executeCmdLine := append(config.pOpts.cmdsForPath, volumeAbsDir)
+
+	executeCmds := append(config.pOpts.cmdsForPath, volumeAbsDir)
 	if config.pOpts.enforceQuota {
-		executeCmdLine = append(executeCmdLine, ";", "truncate", "-s", config.pOpts.capacity, filepath.Join(volumeAbsDir, "disk.img"))
+		executeCmds = append(executeCmds, ";", "truncate", "-s", config.pOpts.capacity, filepath.Join(volumeAbsDir, "disk.img"))
 	}
+	executeCmdLine := strings.Join(executeCmds[:], " ")
+	klog.Infof("Executing via helper pod: %v", executeCmdLine)
 
 	helperPod, err := pod.NewBuilder().
 		WithName(config.podName + "-" + config.pOpts.name).
@@ -186,7 +190,7 @@ func (p *Provisioner) launchPod(config podConfig) (*corev1.Pod, error) {
 			container.NewBuilder().
 				WithName("local-path-" + config.podName).
 				WithImage(p.helperImage).
-				WithCommandNew(executeCmdLine).
+				WithCommandNew([]string{"sh", "-c", executeCmdLine}).
 				//WithCommandNew(append(config.pOpts.cmdsForPath, filepath.Join("/data/", config.volumeDir))).
 				WithVolumeMountsNew([]corev1.VolumeMount{
 					{
